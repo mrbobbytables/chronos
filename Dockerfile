@@ -1,7 +1,7 @@
 ################################################################################
-# chronos:1.0.1
-# Date: 10/7/2015
-# Mesos Version: 0.23.0-1.0
+# chronos:1.0.2
+# Date: 10/16/2015
+# Mesos Version: 0.23.1-0.2.61.ubuntu1404
 # Chronos Version: 2.4.0-0.1.20150828104228.ubuntu1404
 #
 # Description:
@@ -9,7 +9,7 @@
 # mesos-base container updates. 
 ################################################################################
 
-FROM mrbobbytables/mesos-base:1.0.1
+FROM mrbobbytables/mesos-base:1.0.2
 MAINTAINER Bob Killen / killen.bob@gmail.com / @mrbobbytables
 
 
