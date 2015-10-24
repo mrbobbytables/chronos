@@ -2,41 +2,46 @@
     "id": "/chronos",
     "instances": 1,
     "cpus": 1,
-    "mem": 2048,
+    "mem": 512,
     "container": {
         "type": "DOCKER",
         "docker": {
             "image": "registry.address/mesos/chronos",
-            "network": "HOST"
+            "network": "BRIDGE",
+            "portMappings": [
+                {
+                    "containerPort": 31114,
+                    "hostPort": 31114,
+                    "protocol": "tcp"
+                },
+                {
+                    "containerPort": 31115,
+                    "hostPort": 31115,
+                    "protocol": "tcp"
+                }
+            ]
         }
     },
     "env": {
         "ENVIRONMENT": "production",
-        "LOG_STDOUT_THRESHOLD": "WARN",
-        "LIBPROCESS_IP": "$HOST",
-        "LIBPROCESS_PORT": "9001",
+        "ENVIRONMENT_INIT": "/opt/scripts/marathon_env_init.sh",
         "CHRONOS_MASTER": "zk://10.10.0.11:2181,10.10.0.12:2181,10.10.0.13:2181/mesos",
         "CHRONOS_ZK_HOSTS": "zk://10.10.0.11:2181,10.10.0.12:2181,10.10.0.13:2181",
+        "CHRONOS_LOG_STDOUT_THRESHOLD": "WARN",
         "CHRONOS_HOSTANME": "$HOST",
-        "CHRONOS_HTTP_ADDRESS": "$HOST",
-        "CHRONOS_HTTP_PORT": "4400",
         "CHRONOS_MESOS_FRAMEWORK_NAME": "chronos"
     },
     "healthChecks": [
         {
-            "protocol": "COMMAND",
-            "command": {
-                "value": "curl -f -X GET http://$HOST:4400/scheduler/jobs"
-            },
+            "protocol": "HTTP",
+            "portIndex": 0,
+            "path": "/",
             "gracePeriodSeconds": 30,
-            "timeoutSeconds": 60,
-            "maxConsecutiveFailures": 5
+            "intervalSeconds": 20,
+            "maxConsecutiveFailures": 3
         }
     ],
-    "backoffSeconds": 1,
-    "backoffFactor": 1.5,
-    "maxLaunchDelaySeconds": 3600,
     "uris": [
-        "file: ///docker.tar.gz"
+        "file:///docker.tar.gz"
     ]
 }

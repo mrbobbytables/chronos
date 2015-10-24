@@ -3,12 +3,12 @@ An Ubuntu based Chronos container with the capability of logging to both standar
 
 ##### Version Information:
 
-* **Container Release:** 1.0.2
-* **Mesos:** 0.23.1-0.2.61.ubuntu1404
+* **Container Release:** 1.1.0
+* **Mesos:** 0.24.1-0.2.35.ubuntu1404
 * **Chronos:** 2.4.0-0.1.20150828104228.ubuntu1404
 
 **Services Include**
-* **[Chronos](#chronos)** - A Mesos Framework that provides a distributes and fault tolerant 'cron'.
+* **[Chronos](#chronos)** - A Mesos Framework that provides a distributed and fault tolerant 'cron'.
 * **[Logstash-Forwarder](#logstash-forwarder)** - A lightweight log collector and shipper for use with [Logstash](https://www.elastic.co/products/logstash).
 * **[Redpill](#redpill)** - A bash script and healthcheck for supervisord managed services. It is capable of running cleanup scripts that should be executed upon container termination.
 
@@ -31,16 +31,32 @@ An Ubuntu based Chronos container with the capability of logging to both standar
 ---
 
 ### Usage
-When running the Chronos container in a `production` or `deveopment` environment, the container **must** be run with host networking and several environment variables should be specified to function correctly.
 
-* `ENVIRONMENT` - `ENVIRONMENT` will enable or disable serivces and change the value of several other environment variables based on where the container is running (`prod`, `local` etc.). Please see the [Environment](#environment) section under [Important Environment Variables](#important-environment-variables).
+When running the Chronos container in any deployment; the container does require several environment variables to be
+defined to function correctly.
+
+* `ENVIRONMENT` - `ENVIRONMENT` will enable or disable services and change the value of several other environment variables based on where the container is running (`prod`, `local` etc.). Please see the [Environment](#environment) section under [Important Environment Variables](#important-environment-variables).
 
 
-* `LIBPROCESS_PORT` - The port that is used to communicate with Mesos. If running on a host with another Mesos framework or an instance of Mesos-Master or Mesos-Slave, this should be set to unique port (default `9000`).
+* `LIBPROCESS_IP` - The ip in which libprocess will bind to. (defaults to `0.0.0.0`)
+
+* `LIBPROCESS_PORT` - The port used for libprocess communication (defaults to `9000`)
+
+* `LIBPROCESS_ADVERTISE_IP` - If set, this will be the 'advertised' or 'externalized' ip used for libprocess communication. Relevant when running an application that uses libprocess within a container, and should be set to the host IP in which you wish to use for Mesos communication.
+
+* `LIBPROCESS_ADVERTISE_PORT` - If set, this will be the 'advertised' or 'externalized' port used for libprocess communication. Relevant when running an application that uses libprocess within a container, and should be set to the host port you wish to use for Mesos communication.
 
 * `CHRONOS_MASTER` - The zk url of Mesos Masters.
 
 * `CHRONOS_ZK_HOSTS` - A comma delimited list of Zookeeper servers used for storing Chronos state. **Note:** Does not need to be prefixed with `zk://`.
+
+The libprocess variables are not necessarily required if using host networking (as long as the default ip and port are available). However, you will quickly run into problems if attempting to run it alongside another container attempting to do the same thing. This is where running with an alternate `LIBPROCESS_PORT` or running the container with standard bridge networking and using the two `LIBPROCESS_ADVERTISE_*` variables is ideal.
+
+A supplied sample seed script is available at `/opt/scripts/marathon_env_init.sh`. This will assign 1 to 1 mappings of the 2 exposed ports needed for Chronos + Mesos to their associated variables.
+
+* `PORT0` - The Chronos WebUI
+* `PORT1` - port used for both `LIBPROCESS_PORT` and `LIBPROCESS_ADVERTISED_PORT`.
+
 
 
 For further configuration information, please see the [Chronos](#chronos) service section.
@@ -48,21 +64,24 @@ For further configuration information, please see the [Chronos](#chronos) servic
 ---
 
 ### Example Run Command
+
 ```
-docker run -d --net=host \
--e ENVIRONMENT=production \
--e PARENT_HOST=$(hostname) \
--e LIBPROCESS_IP=10.10.0.11 \
--e LIBPROCESS_PORT=9001 \
--e CHRONOS_MASTER=zk://10.10.0.11:2181,10.10.0.12:2181,10.10.0.13:2181/mesos \
--e CHRONOS_ZK_HOSTS=zk://10.10.0.11:2181,10.10.0.12:2181,10.10.0.13:2181 \
--e CHRONOS_HOSTNAME=10.10.0.11 \
--e CHRONOS_HTTP_ADDRESS=10.10.0.11 \
--e CHRONOS_HTTP_PORT=4400 \
--e CHRONOS_MESOS_FRAMEWORK_NAME=chronos \
+docker run -d                 \
+--name chronos                \
+-e ENVIRONMENT=production     \
+-e PARENT_HOST=$(hostname)    \
+-e LOG_STDOUT_THRESHOLD=WARN  \
+-e LIBPROCESS_PORT=9200       \
+-e LIBPROCESS_ADVERTISE_PORT=9200      \
+-e LIBPROCESS_ADVERTISE_IP=10.10.0.11  \
+-e CHRONOS_MASTER=zk://10.10.0.11:2181,10.10.0.12:2181,10.10.0.13:2181/mesos  \
+-e CHRONOS_ZK_HOSTS=zk://10.10.0.11:2181,10.10.0.12:2181,10.10.0.13:2181      \
+-e CHRONOS_HOSTNAME=10.10.0.11           \
+-e CHRONOS_HTTP_PORT=4400                \
+-e CHRONOS_MESOS_FRAMEWORK_NAME=chronos  \
+-p 4400:4400  \
+-p 9200:9200  \
 chronos
-
-
 ```
 
 ---
@@ -74,48 +93,78 @@ chronos
     "id": "/chronos",
     "instances": 1,
     "cpus": 1,
-    "mem": 2048,
+    "mem": 512,
     "container": {
         "type": "DOCKER",
         "docker": {
             "image": "registry.address/mesos/chronos",
-            "network": "HOST"
+            "network": "BRIDGE",
+            "portMappings": [
+                {
+                    "containerPort": 31114,
+                    "hostPort": 31114,
+                    "protocol": "tcp"
+                },
+                {
+                    "containerPort": 31115,
+                    "hostPort": 31115,
+                    "protocol": "tcp"
+                }
+            ]
         }
     },
     "env": {
         "ENVIRONMENT": "production",
-        "PARENT_HOST": "$HOST",
-        "LOG_STDOUT_THRESHOLD": "WARN",
-        "LIBPROCESS_IP": "$HOST",
-        "LIBPROCESS_PORT": "9001",
+        "ENVIRONMENT_INIT": "/opt/scripts/marathon_env_init.sh",
         "CHRONOS_MASTER": "zk://10.10.0.11:2181,10.10.0.12:2181,10.10.0.13:2181/mesos",
         "CHRONOS_ZK_HOSTS": "zk://10.10.0.11:2181,10.10.0.12:2181,10.10.0.13:2181",
+        "CHRONOS_LOG_STDOUT_THRESHOLD": "WARN",
         "CHRONOS_HOSTANME": "$HOST",
-        "CHRONOS_HTTP_ADDRESS": "$HOST",
-        "CHRONOS_HTTP_PORT": "4400",
         "CHRONOS_MESOS_FRAMEWORK_NAME": "chronos"
     },
     "healthChecks": [
         {
-            "protocol": "COMMAND",
-            "command": {
-                "value": "curl -f -X GET http://$HOST:4400/scheduler/jobs"
-            },
+            "protocol": "HTTP",
+            "portIndex": 0,
+            "path": "/",
             "gracePeriodSeconds": 30,
-            "timeoutSeconds": 60,
-            "maxConsecutiveFailures": 5
+            "intervalSeconds": 20,
+            "maxConsecutiveFailures": 3
         }
     ],
-    "backoffSeconds": 1,
-    "backoffFactor": 1.5,
-    "maxLaunchDelaySeconds": 3600,
     "uris": [
-        "file: ///docker.tar.gz"
+        "file:///docker.tar.gz"
     ]
 }
-
 ```
 * **Note:** The example assumes a v1.6+ version of docker or a v2 version of the docker registry. For information on using an older version or connecting to a v1 registry, please see the [private registry](https://mesosphere.github.io/marathon/docs/native-docker-private-registry.html) section of the Marathon documentation.
+
+### Example ENVIRONMENT_INIT script
+
+```
+#!/bin/bash
+
+##### Sample environment init script #####
+# PORT0 = Chronos Web
+# PORT1 = libprocess bind port
+##########################################
+
+
+
+local local_ip="$(ip addr show eth0 | grep -m 1 -P -o '(?<=inet )[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}')"
+
+export CHRONOS_HTTP_PORT="$PORT0"
+export LIBPROCESS_IP="$local_ip"
+export LIBPROCESS_PORT="$PORT1"
+export LIBPROCESS_ADVERTISE_IP="$HOST"
+export LIBPROCESS_ADVERTISE_PORT="$PORT1"
+
+echo "[$(date)][env-init][CHRONOS_HTTP_PORT] $PORT0"
+echo "[$(date)][env-init][LIBPROCESS_IP] $local_ip"
+echo "[$(date)][env-init][LIBPROCESS_PORT] $PORT1"
+echo "[$(date)][env-init][LIBPROCESS_ADVERTISE_IP] $HOST"
+echo "[$(date)][env-init][LIBPROCESS_ADVERTISE_PORT] $PORT1"
+```
 
 ---
 ---
@@ -124,21 +173,21 @@ chronos
 ### Modification and Anatomy of the Project
 
 **File Structure**
-The directory `skel` in the project root maps to the root of the filesystem once the container is built. Files and folders placed there will map to their corrisponding location within the container.
+The directory `skel` in the project root maps to the root of the file system once the container is built. Files and folders placed there will map to their corresponding location within the container.
 
 **Init**
-The init script (`./init.sh`) found at the root of the directory is the entry process for the container. It's role is to simply set specific environment variables and modify any subsiquently required configuration files.
+The init script (`./init.sh`) found at the root of the directory is the entry process for the container. It's role is to simply set specific environment variables and modify any subsequently required configuration files.
 
 **Chronos**
 The chronos configuration will automatically be generated at runtime, however logging options are specified in `/etc/chronos/log4j.properties`.
 
 **Supervisord**
-All supervisord configs can be found in `/etc/supervisor/conf.d/`. Services by default will redirect their stdout to `/dev/fd/1` and stderr to `/dev/fd/2` allowing for service's console output to be displayed. Most applications can log to both stdout and their respecively specified log file.
+All supervisord configs can be found in `/etc/supervisor/conf.d/`. Services by default will redirect their stdout to `/dev/fd/1` and stderr to `/dev/fd/2` allowing for service's console output to be displayed. Most applications can log to both stdout and their respectively specified log file.
 
 In some cases (such as with zookeeper), it is possible to specify different logging levels and formats for each location.
 
 **Logstash-Forwarder**
-The Logstash-Forwarder binary and default configuration file can be found in `/skel/opt/logstash-forwarder`. It is ideal to bake the Logstash Server certificate into the base container at this location. If the certificate is called `logstash-forwarder.crt`, the default supplied Logstash-Forwarder config should not need to be modified, and the server setting may be passed through the `SERICE_LOGSTASH_FORWARDER_ADDRESS` environment variable.
+The Logstash-Forwarder binary and default configuration file can be found in `/skel/opt/logstash-forwarder`. It is ideal to bake the Logstash Server certificate into the base container at this location. If the certificate is called `logstash-forwarder.crt`, the default supplied Logstash-Forwarder config should not need to be modified, and the server setting may be passed through the `SERVICE_LOGSTASH_FORWARDER_ADDRESS` environment variable.
 
 In practice, the supplied Logstash-Forwarder config should be used as an example to produce one tailored to each deployment.
 
@@ -156,8 +205,10 @@ In practice, the supplied Logstash-Forwarder config should be used as an example
 | `ENVIRONMENT`                     | `local`                               |
 | `PARENT_HOST`                     | `unknown`                             |
 | `JAVA_OPTS`                       |                                       |
-| `LIBPROCESS_IP`                   |                                       |
+| `LIBPROCESS_IP`                   | `0.0.0.0`                             |
 | `LIBPROCESS_PORT`                 | `9000`                                |
+| `LIBPROCESS_ADVERTISE_IP`         |                                       |
+| `LIBPROCESS_ADVERTISE_PORT`       |                                       |
 | `CHRONOS_LOG_DIR`                 | `/var/log/chronos`                    |
 | `CHRONOS_LOG_FILE`                | `chronos.log`                         |
 | `CHRONOS_LOG_FILE_LAYOUT`         | `json`                                |
@@ -181,9 +232,13 @@ In practice, the supplied Logstash-Forwarder config should be used as an example
 
 * `JAVA_OPTS` - The Java environment variables that will be passed to Marathon at runtime. Generally used for adjusting memory allocation (`-Xms` and `-Xmx`).
 
-* `LIBPROCESS_IP` - The IP used to communicate with Mesos.
+* `LIBPROCESS_IP` - The ip in which libprocess will bind to. (defaults to `0.0.0.0`)
 
-* `LIBPROCESS_PORT` - The port that will be used for communicating with Mesos.
+* `LIBPROCESS_PORT` - The port used for libprocess communication (defaults to `9000`)
+
+* `LIBPROCESS_ADVERTISE_IP` - If set, this will be the 'advertised' or 'externalized' ip used for libprocess communication. Relevant when running an application that uses libprocess within a container, and should be set to the host IP in which you wish to use for Mesos communication.
+
+* `LIBPROCESS_ADVERTISE_PORT` - If set, this will be the 'advertised' or 'externalized' port used for libprocess communication. Relevant when running an application that uses libprocess within a container, and should be set to the host port you wish to use for Mesos communication.
 
 * `CHRONOS_LOG_DIR` - The directory in which the Chronos log files will be stored.
 
@@ -253,7 +308,7 @@ In practice, the supplied Logstash-Forwarder config should be used as an example
 ### Chronos
 Chronos is a highly-available 'distributed cron' Mesos Framework developed by the folks at [Airbnb](http://nerds.airbnb.com/introducing-chronos/). They've made the code and documentation available over at [github](https://github.com/mesos/chronos).
 
-By default, Chronos does not supporting provinding start parameters as environment variables; however the init script will translate environment variables to parameters as long as they follow the form `CHRONOS_<COMMAND_LINE_OPTION>` e.g. `CHRONOS_MASTER=zk://10.10.0.11:2181,10.10.0.12:2181,10.10.0.13:2181/mesos`.
+By default, Chronos does not supporting providing start parameters as environment variables; however the init script will translate environment variables to parameters as long as they follow the form `CHRONOS_<COMMAND_LINE_OPTION>` e.g. `CHRONOS_MASTER=zk://10.10.0.11:2181,10.10.0.12:2181,10.10.0.13:2181/mesos`.
 
 A list of the Chronos command line flags can be found in their [configuration](https://github.com/mesos/chronos/blob/master/docs/docs/configuration.md) docs.
 Alternatively, you can execute the following command to print the available options with the container itself:
@@ -300,7 +355,7 @@ Logstash-Forwarder is a lightweight application that collects and forwards logs 
 | **Variable**                         | **Default**                                                                             |
 |--------------------------------------|-----------------------------------------------------------------------------------------|
 | `SERVICE_LOGSTASH_FORWARDER`         |                                                                                         |
-| `SERVICE_LOGSTASH_FORWARDER_CONF`    | `/opt/logstash-forwarer/chronos.conf`                                                   |
+| `SERVICE_LOGSTASH_FORWARDER_CONF`    | `/opt/logstash-forwadrer/chronos.conf`                                                   |
 | `SERVICE_LOGSTASH_FORWARDER_ADDRESS` |                                                                                         |
 | `SERVICE_LOGSTASH_FORWARDER_CERT`    |                                                                                         |
 | `SERVICE_LOGSTASH_FORWARDER_CMD`     | `/opt/logstash-forwarder/logstash-forwarder -config=”$SERVICE_LOGSTASH_FORWARDER_CONF”` |
@@ -353,7 +408,7 @@ Redpill - Supervisor status monitor. Terminates the supervisor process if any sp
 
 -c | --cleanup    Optional path to cleanup script that should be executed upon exit.
 -h | --help       This help text.
--i | --inerval    Optional interval at which the service check is performed in seconds. (Default: 30)
+-i | --interval   Optional interval at which the service check is performed in seconds. (Default: 30)
 -s | --service    A comma delimited list of the supervisor service names that should be monitored.
 ```
 
@@ -365,3 +420,5 @@ Redpill - Supervisor status monitor. Terminates the supervisor process if any sp
 In the event of an issue, the `ENVIRONMENT` variable can be set to `debug`.  This will stop the container from shipping logs and prevent it from terminating if one of the services enters a failed state.
 
 For further support, please see either the [Chronos Github Project](https://github.com/mesos/chronos) or post to the [Chronos Google Group](https://groups.google.com/forum/#!forum/chronos-scheduler).
+
+
