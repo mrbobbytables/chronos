@@ -1,3 +1,7 @@
+2015-12-18 - 1.1.2:
+ - Bump to Mesos 0.25
+ - Bump to Chronos 2.4.0-0.1.20151007110204.ubuntu1404
+
 2015-11-23 - 1.1.1:
  - Use ubuntu-base image 1.0.2
 
