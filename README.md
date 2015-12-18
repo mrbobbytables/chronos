@@ -3,9 +3,9 @@ An Ubuntu based Chronos container with the capability of logging to both standar
 
 ##### Version Information:
 
-* **Container Release:** 1.1.1
-* **Mesos:** 0.24.1-0.2.35.ubuntu1404
-* **Chronos:** 2.4.0-0.1.20150828104228.ubuntu1404
+* **Container Release:** 1.1.2
+* **Mesos:** 0.25.0-0.2.70.ubuntu1404
+* **Chronos:** 2.4.0-0.1.20151007110204.ubuntu1404
 
 **Services Include**
 * **[Chronos](#chronos)** - A Mesos Framework that provides a distributed and fault tolerant 'cron'.

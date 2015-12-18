@@ -1,20 +1,20 @@
 ################################################################################
-# chronos: 1.1.1
-# Date: 11/23/2015
-# Mesos Version: 0.24.1-0.2.35.ubuntu1404
-# Chronos Version: 2.4.0-0.1.20150828104228.ubuntu1404
+# chronos: 1.1.2
+# Date: 12/18/2015
+# Mesos Version: 0.25.0-0.2.70.ubuntu1404
+# Chronos Version: 2.4.0-0.1.20151007110204.ubuntu1404
 #
 # Description:
 # Container packaging the Chronos Mesos framework. Mesos-version tied to 
 # mesos-base container updates. 
 ################################################################################
 
-FROM mrbobbytables/mesos-base:1.1.2
+FROM mrbobbytables/mesos-base:1.1.3
 
 MAINTAINER Bob Killen / killen.bob@gmail.com / @mrbobbytables
 
 
-ENV VERSION_CHRONOS=2.4.0-0.1.20150828104228.ubuntu1404
+ENV VERSION_CHRONOS=2.4.0-0.1.20151007110204.ubuntu1404
 
 RUN apt-get -y update          \
  && apt-get -y install         \
