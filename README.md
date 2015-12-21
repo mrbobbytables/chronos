@@ -3,8 +3,8 @@ An Ubuntu based Chronos container with the capability of logging to both standar
 
 ##### Version Information:
 
-* **Container Release:** 1.1.2
-* **Mesos:** 0.25.0-0.2.70.ubuntu1404
+* **Container Release:** 1.1.3
+* **Mesos:** 0.26.0-0.2.145.ubuntu1404
 * **Chronos:** 2.4.0-0.1.20151007110204.ubuntu1404
 
 **Services Include**
