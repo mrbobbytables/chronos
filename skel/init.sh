@@ -27,6 +27,7 @@ init_vars() {
   export CHRONOS_LOG_FILE=${CHRONOS_LOG_FILE:-chronos.log}
   export CHRONOS_LOG_FILE_LAYOUT=${CHRONOS_LOG_fILE_LAYOUT:-json}
 
+  export SERVICE_CONSUL_TEMPLATE=${SERVICE_CONSUL_TEMPLATE:-disabled}
   export SERVICE_LOGSTASH_FORWARDER_CONF=${SERVICE_LOGSTASH_FORWARDER_CONF:-/opt/logstash-forwarder/chronos.conf}
   export SERVICE_REDPILL_MONITOR=${SERVICE_REDPILL_MONITOR:-chronos}
 
@@ -44,6 +45,10 @@ init_vars() {
       export CHRONOS_LOG_FILE_THRESHOLD=${CHRONOS_LOG_FILE_THRESHOLD:-DEBUG}
       export SERVICE_LOGSTASH_FORWARDER=${SERVICE_LOGSTASH_FORWARDER:-disabled}
       export SERVICE_REDPILL=${SERVICE_REDPILL:-disabled}
+      if [[ "$SERVICE_CONSUL_TEMPLATE" == "enabled" ]]; then
+        export SERVICE_LOGROTATE=${SERVICE_LOGROTATE:-disabled}
+        export CONSUL_TEMPLATE_LOG_LEVEL=${CONSUL_TEMPLATE_LOG_LEVEL:-debug}
+      fi
       ;;
    local|*)
       local local_ip="$(ip addr show eth0 | grep -m 1 -P -o '(?<=inet )[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}')"
@@ -56,6 +61,10 @@ init_vars() {
       ;;
   esac
 
+  if [[ "$SERVICE_CONSUL_TEMPLATE" == "enabled" ]]; then
+    export SERVICE_LOGROTATE=${SERVICE_LOGROTATE:-enabled}
+    export SERVICE_RSYSLOG=${SERVICE_RSYSLOG:-enabled}
+  fi
 }
 
 config_chronos() {
@@ -95,7 +104,7 @@ config_chronos() {
     cmd_flags+=( "${!i}" )
   done
 
-  local chronos_cmd="java ${jvm_opts[@]}  -cp $JSONLOG4JCP:/usr/bin/chronos org.apache.mesos.chronos.scheduler.Main ${cmd_flags[@]}"
+  local chronos_cmd="java ${jvm_opts[*]}  -cp $JSONLOG4JCP:/usr/bin/chronos org.apache.mesos.chronos.scheduler.Main ${cmd_flags[*]}"
   export SERVICE_CHRONOS_CMD=${SERVICE_CHRONOS_CMD:-"$(__escape_svsr_txt "$chronos_cmd")"}
 }
 
@@ -106,8 +115,12 @@ main() {
   echo "[$(date)[App-Name] $APP_NAME"
   echo "[$(date)][Environment] $ENVIRONMENT"
 
+  __config_service_consul_template
+  __config_service_logrotate
   __config_service_logstash_forwarder
   __config_service_redpill
+  __config_service_rsyslog
+
   config_chronos
 
   echo "[$(date)][Chronos][Start-Command] $SERVICE_CHRONOS_CMD"
